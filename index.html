@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <title>Maasai Duka</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>MAASAI DUKA</h1>
+      <p>Johnson's Simple Sales & Credit Book</p>
+    </div>
+    <button class="small" id="refreshBtn">↻</button>
+  </header>
+
+  <main>
+    <section id="home" class="screen active">
+      <div class="summary">
+        <div><span>Today's Sales</span><strong id="todaySales">KES 0</strong></div>
+        <div><span>Credit Today</span><strong id="todayCredit">KES 0</strong></div>
+        <div class="danger"><span>Money to Collect</span><strong id="totalCredit">KES 0</strong></div>
+      </div>
+
+      <div class="menu">
+        <button data-go="sale">🛒<b>SALE</b><small>Cash / M-Pesa</small></button>
+        <button data-go="credit">📒<b>CREDIT</b><small>Sell on credit</small></button>
+        <button data-go="repay">💰<b>REPAY</b><small>Receive payment</small></button>
+        <button data-go="customers">👥<b>CUSTOMERS</b><small>Credit balances</small></button>
+        <button data-go="products">📦<b>PRODUCTS</b><small>Photos & prices</small></button>
+        <button data-go="history">🧾<b>HISTORY</b><small>Transactions</small></button>
+      </div>
+    </section>
+
+    <section id="sale" class="screen">
+      <div class="screen-title"><button class="back">←</button><h2>SALE</h2></div>
+      <div id="saleProducts" class="product-grid"></div>
+      <div class="cart">
+        <h3>Current Sale</h3>
+        <div id="saleCart"></div>
+        <label>Payment</label>
+        <div class="choice">
+          <button class="pay active" data-pay="cash">CASH</button>
+          <button class="pay" data-pay="mpesa">M-PESA</button>
+        </div>
+        <button id="saveSale" class="primary">SAVE SALE · <span id="saleTotal">KES 0</span></button>
+      </div>
+    </section>
+
+    <section id="credit" class="screen">
+      <div class="screen-title"><button class="back">←</button><h2>CREDIT SALE</h2></div>
+      <label>Customer</label>
+      <select id="creditCustomer"><option value="">Choose customer</option></select>
+      <button class="secondary" id="quickCustomer">+ NEW CUSTOMER</button>
+      <div id="creditProducts" class="product-grid"></div>
+      <div class="cart">
+        <h3>Credit Items</h3>
+        <div id="creditCart"></div>
+        <button id="saveCredit" class="primary danger-btn">SAVE CREDIT · <span id="creditTotal">KES 0</span></button>
+      </div>
+    </section>
+
+    <section id="repay" class="screen">
+      <div class="screen-title"><button class="back">←</button><h2>REPAY</h2></div>
+      <label>Customer</label>
+      <select id="repayCustomer"><option value="">Choose customer</option></select>
+      <div class="balance-box">Balance: <strong id="repayBalance">KES 0</strong></div>
+      <label>Amount received</label>
+      <input id="repayAmount" type="number" min="0" step="1" placeholder="KES" />
+      <label>Received by</label>
+      <div class="choice">
+        <button class="repay-pay active" data-pay="cash">CASH</button>
+        <button class="repay-pay" data-pay="mpesa">M-PESA</button>
+      </div>
+      <button id="saveRepay" class="primary">SAVE PAYMENT</button>
+    </section>
+
+    <section id="customers" class="screen">
+      <div class="screen-title"><button class="back">←</button><h2>CUSTOMERS</h2></div>
+      <button id="addCustomerBtn" class="secondary">+ ADD CUSTOMER</button>
+      <div id="customerList" class="list"></div>
+    </section>
+
+    <section id="products" class="screen">
+      <div class="screen-title"><button class="back">←</button><h2>PRODUCTS</h2></div>
+      <button id="addProductBtn" class="secondary">📷 + ADD PRODUCT</button>
+      <p class="hint">Add a photo once. Johnson can then tap the product photo during sales.</p>
+      <div id="productAdmin" class="list"></div>
+    </section>
+
+    <section id="history" class="screen">
+      <div class="screen-title"><button class="back">←</button><h2>HISTORY</h2></div>
+      <div id="historyList" class="list"></div>
+    </section>
+  </main>
+
+  <dialog id="customerDialog">
+    <form method="dialog" id="customerForm">
+      <h3>New Customer</h3>
+      <label>Name</label><input id="customerName" required />
+      <label>Phone (optional)</label><input id="customerPhone" />
+      <div class="dialog-actions"><button value="cancel">CANCEL</button><button id="customerSave" value="default" class="primary">SAVE</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="productDialog">
+    <form method="dialog" id="productForm">
+      <h3>Add Product</h3>
+      <label>Product photo</label>
+      <input id="productPhoto" type="file" accept="image/*" capture="environment" />
+      <img id="photoPreview" class="preview" alt="" />
+      <label>Name</label><input id="productName" required placeholder="e.g. Potato" />
+      <label>Price (KES)</label><input id="productPrice" type="number" min="0" step="1" required />
+      <label>Unit</label>
+      <select id="productUnit"><option>item</option><option>piece</option><option>kg</option><option>packet</option><option>bunch</option></select>
+      <div class="dialog-actions"><button value="cancel">CANCEL</button><button id="productSave" value="default" class="primary">SAVE</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
