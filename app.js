@@ -11,6 +11,20 @@ const today=()=>new Date().toISOString().slice(0,10);
 const val=(o,...keys)=>{for(const k of keys)if(o&&o[k]!=null)return o[k];return null};
 const num=(o,...keys)=>Number(val(o,...keys)||0);
 function created(r){return val(r,"created_at","sale_date","date","purchased_at","paid_at")||""}
+// ===== ADMIN PIN =====
+const ADMIN_PIN = "0813";
+
+function openAdmin(){
+  const pin = prompt("Enter Admin PIN");
+  if(pin === null) return;
+
+  if(pin !== ADMIN_PIN){
+    alert("Wrong PIN");
+    return;
+  }
+
+  showView("admin");
+}
 function showView(id){
   document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
   $(id).classList.add("active");
