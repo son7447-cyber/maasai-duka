@@ -1,29 +1,73 @@
-const sb = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_PUBLISHABLE_KEY
-);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const $=id=>document.getElementById(id);
 let products=[],customers=[],suppliers=[],sales=[],repayments=[],purchases=[],supplierPayments=[];
 let editingProduct=null,tempPhoto=null;
 let activeCategory="All";
 const PRODUCT_CATEGORIES=["Flour & Cereals","Vegetables","Fruits","Drinks","Snacks","Household","Other"];
+const ADMIN_PIN="0813";
+let isAdminAuthed=false;
+let pendingAdminAction=null;
 
 const money=n=>"KES "+Number(n||0).toLocaleString("en-KE",{maximumFractionDigits:2});
 const today=()=>new Date().toISOString().slice(0,10);
 const val=(o,...keys)=>{for(const k of keys)if(o&&o[k]!=null)return o[k];return null};
 const num=(o,...keys)=>Number(val(o,...keys)||0);
 function created(r){return val(r,"created_at","sale_date","date","purchased_at","paid_at")||""}
+
 function showView(id){
-  document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
-  $(id).classList.add("active");
-  document.body.classList.toggle("admin-mode", id === "admin");
-  if(id==="admin") loadAdmin();
-  if(id==="history") renderHistory();
-  window.scrollTo(0,0);
+ document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
+ $(id).classList.add("active");
+ document.body.classList.toggle("admin-mode", id === "admin");
+ if(id==="admin")loadAdmin();
+ if(id==="history")renderHistory();
+ window.scrollTo(0,0);
 }
 function goHome(){showView("home");refreshAll()}
-function closeModal(){$("modal").classList.add("hidden");tempPhoto=null;editingProduct=null}
+function exitAdmin(){isAdminAuthed=false;goHome();$("adminPanel").innerHTML=""}
+function closeModal(){$("modal").classList.add("hidden");tempPhoto=null;editingProduct=null;pendingAdminAction=null}
 function modal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("modal").classList.remove("hidden")}
+
+function requestAdminAccess(action="admin"){
+  if(isAdminAuthed){
+    performAdminAction(action);
+    return;
+  }
+  pendingAdminAction=action;
+  modal("Admin PIN",`
+    <label>Enter Admin PIN<input id="adminPinInput" type="password" inputmode="numeric" placeholder="0813"></label>
+    <button class="primary" onclick="submitAdminPin()">ENTER ADMIN</button>
+    <div id="pinError" class="pin-error"></div>
+    <div class="pin-help">Current admin PIN: 0813</div>
+  `);
+  setTimeout(()=>$("adminPinInput")?.focus(),60);
+}
+function submitAdminPin(){
+  const pin=$("adminPinInput").value.trim();
+  if(pin!==ADMIN_PIN){
+    $("pinError").textContent="Wrong PIN. Please try again.";
+    return;
+  }
+  isAdminAuthed=true;
+  const action=pendingAdminAction||"admin";
+  closeModal();
+  performAdminAction(action);
+}
+function performAdminAction(action){
+  if(action==="admin") return showView("admin");
+  if(action==="suppliers"){
+    showView("admin");
+    return setTimeout(()=>showAdminPanel("suppliers"),40);
+  }
+  if(action==="productsAdd"){
+    showView("products");
+    return setTimeout(()=>openProduct(),40);
+  }
+  if(action==="customerAdd"){
+    showView("customers");
+    return setTimeout(()=>openCustomer(),40);
+  }
+}
+
 async function q(table,select="*"){const {data,error}=await sb.from(table).select(select);if(error){console.warn(table,error.message);return []}return data||[]}
 async function refreshAll(){
  [products,customers,suppliers,sales,repayments,purchases,supplierPayments]=await Promise.all([
@@ -48,31 +92,51 @@ function customerCredit(){
 function productName(id){return val(products.find(p=>String(p.id)===String(id)),"name","product_name")||"Product"}
 function customerName(id){return val(customers.find(c=>String(c.id)===String(id)),"name","customer_name")||"Customer"}
 function supplierName(id){return val(suppliers.find(c=>String(c.id)===String(id)),"name","supplier_name")||"Supplier"}
-function productCategory(p){return val(p,"category","product_category")||"Other"}
-function sortedProducts(){return [...products].sort((a,b)=>productCategory(a).localeCompare(productCategory(b))||String(val(a,"name","product_name")||"").localeCompare(String(val(b,"name","product_name")||"")))}
+function productCategory(p){return val(p,"category")||"Other"}
+
 function renderCategoryTabs(){
- const el=$("categoryTabs");if(!el)return;
- const cats=["All",...PRODUCT_CATEGORIES.filter(c=>products.some(p=>productCategory(p)===c))];
- el.innerHTML=cats.map(c=>`<button class="${activeCategory===c?"active":""}" onclick="activeCategory='${c}';renderProducts()">${c}</button>`).join("");
+ if(!$("categoryTabs"))return;
+ const cats=["All",...PRODUCT_CATEGORIES];
+ $("categoryTabs").innerHTML=cats.map(cat=>`<button class="${activeCategory===cat?'active':''}" onclick="setCategory('${cat.replace(/'/g,"\\'")}')">${cat}</button>`).join("")
 }
+function setCategory(cat){activeCategory=cat;renderCategoryTabs();renderProducts()}
+
 function renderProducts(){
- if(!$("productList"))return; renderCategoryTabs();
- const list=sortedProducts().filter(p=>activeCategory==="All"||productCategory(p)===activeCategory);
- $("productList").innerHTML=list.length?list.map(p=>`<div class="row">
-  ${val(p,"image_url","photo_url")?`<img src="${val(p,"image_url","photo_url")}">`:`<div style="width:62px"></div>`}
-  <div class="grow"><b>${val(p,"name","product_name")||"Unnamed"}</b><small>${productCategory(p)} · ${money(num(p,"price","selling_price"))} · Stock ${num(p,"stock_qty","stock","quantity")} ${val(p,"unit")||""}</small></div>
-  <div class="row-actions"><button onclick="openProduct('${p.id}')">EDIT</button></div></div>`).join(""):'<p class="muted">No products in this category.</p>'
+ renderCategoryTabs();
+ if(!$("productList"))return;
+ const sorted=[...products].sort((a,b)=>String(val(a,"name","product_name")||"").localeCompare(String(val(b,"name","product_name")||"")));
+ const filtered=sorted.filter(p=>activeCategory==="All"||productCategory(p)===activeCategory);
+ $("productList").innerHTML=filtered.map(p=>`
+  <div class="row">
+    ${val(p,"image_url","photo_url")?`<img src="${val(p,"image_url","photo_url")}" alt="">`:"<div style='width:62px;height:62px;border-radius:11px;background:#f2eee7;display:grid;place-items:center;font-size:25px'>📦</div>"}
+    <div class="grow"><b>${val(p,"name","product_name")}</b><small>${productCategory(p)} · ${money(num(p,"price","selling_price"))} · ${val(p,"unit")||"unit"} · stock ${num(p,"stock_qty","stock","quantity")}</small></div>
+    <div class="row-actions">
+      ${isAdminAuthed?`<button onclick="openProduct('${p.id}')">EDIT</button>`:""}
+      ${isAdminAuthed?`<button onclick="deleteProduct('${p.id}')">DEL</button>`:""}
+    </div>
+  </div>`).join("")||'<p class="muted">No products yet.</p>'
 }
 function renderCustomers(){
  if(!$("customerList"))return;
- $("customerList").innerHTML=customers.length?customers.map(c=>`<div class="row"><div class="grow"><b>${val(c,"name","customer_name")||"Unnamed"}</b><small>${val(c,"phone")||""}</small></div></div>`).join(""):'<p class="muted">No customers yet.</p>'
+ $("customerList").innerHTML=customers.map(c=>`<div class="row"><div class="grow"><b>${val(c,"name","customer_name")}</b><small>${val(c,"phone")||""}</small></div><b>${money(customerBalance(c.id))}</b></div>`).join("")||'<p class="muted">No customers.</p>'
 }
-function fillSelect(id,arr,labelFn){const e=$(id);if(!e)return;e.innerHTML='<option value="">Select</option>'+arr.map(x=>`<option value="${x.id}">${labelFn(x)}</option>`).join("")}
+function customerBalance(cid){
+ const sold=sales.filter(s=>String(val(s,"customer_id"))===String(cid)).reduce((a,s)=>a+saleTotal(s),0);
+ const paid=repayments.filter(r=>String(val(r,"customer_id"))===String(cid)).reduce((a,r)=>a+num(r,"amount","paid_amount"),0);
+ return Math.max(0,sold-paid);
+}
+function fillSelect(id,items,fmt){
+ const el=$(id);if(!el)return;
+ el.innerHTML=items.map(x=>`<option value="${x.id}">${fmt(x)}</option>`).join("")
+}
 function fillSelects(){
- ["saleProduct","creditProduct"].forEach(id=>fillSelect(id,products,p=>`${val(p,"name","product_name")} — ${money(num(p,"price","selling_price"))}`));
+ fillSelect("saleProduct",products,p=>`${val(p,"name","product_name")} — ${money(num(p,"price","selling_price"))}`);
+ fillSelect("creditProduct",products,p=>`${val(p,"name","product_name")} — ${money(num(p,"price","selling_price"))}`);
  ["creditCustomer","repayCustomer"].forEach(id=>fillSelect(id,customers,c=>val(c,"name","customer_name")));
 }
+
 function openProduct(id=null){
+ if(!isAdminAuthed)return requestAdminAccess('productsAdd');
  editingProduct=products.find(p=>String(p.id)===String(id))||null; const p=editingProduct||{};
  modal(editingProduct?"Edit Product":"Add Product",`
  <label>Product photo <input id="pPhoto" type="file" accept="image/*" capture="environment" onchange="previewPhoto(event)"></label>
@@ -80,12 +144,11 @@ function openProduct(id=null){
  <p class="muted">The selected photo is only a temporary preview. It is uploaded only when you choose “Use as representative photo”.</p>
  <label><input id="pKeepPhoto" type="checkbox" ${editingProduct?"":"checked"}> Use selected photo as representative photo</label>
  <label>Name<input id="pName" value="${val(p,"name","product_name")||""}"></label>
- <label>Category<select id="pCategory">${PRODUCT_CATEGORIES.map(c=>`<option>${c}</option>`).join("")}</select></label>
  <label>Price (KES)<input id="pPrice" type="number" value="${num(p,"price","selling_price")||""}"></label>
+ <label>Category<select id="pCategory">${PRODUCT_CATEGORIES.map(c=>`<option ${productCategory(p)===c?'selected':''}>${c}</option>`).join("")}</select></label>
  <label>Unit<select id="pUnit"><option>piece</option><option>kg</option><option>packet</option><option>bottle</option><option>crate</option><option>other</option></select></label>
- <button class="primary" onclick="saveProduct()">SAVE</button> ${editingProduct?`<button class="danger" onclick="deleteProduct('${editingProduct.id}')">DELETE PRODUCT</button>`:""}`);
+ <button class="primary" onclick="saveProduct()">SAVE</button>`);
  if(val(p,"unit"))$("pUnit").value=val(p,"unit");
- $("pCategory").value=productCategory(p);
 }
 function previewPhoto(e){const f=e.target.files?.[0];if(!f)return;tempPhoto=f;const u=URL.createObjectURL(f);$("pPreview").src=u;$("pPreview").classList.remove("hidden")}
 async function uploadRepresentative(file){
@@ -108,7 +171,6 @@ async function saveProduct(){
  if(res.error)return alert("Could not save product: "+res.error.message);
  closeModal();await refreshAll();
 }
-
 async function deleteProduct(id){
  if(!confirm("Delete this product? If it is used in old transactions, the database may protect it."))return;
  const {error}=await sb.from("products").delete().eq("id",id);
@@ -116,6 +178,7 @@ async function deleteProduct(id){
  closeModal();await refreshAll();
 }
 function openCustomer(){
+ if(!isAdminAuthed)return requestAdminAccess('customerAdd');
  modal("Add Customer",`<label>Name<input id="cName"></label><label>Phone (optional)<input id="cPhone"></label><button class="primary" onclick="saveCustomer()">SAVE</button>`)
 }
 async function saveCustomer(){
@@ -164,6 +227,7 @@ async function loadAdmin(){
  $("aStock").textContent=money(products.reduce((a,p)=>a+num(p,"stock_qty","stock","quantity")*num(p,"cost_price","purchase_price","buying_price"),0));
 }
 function showAdminPanel(kind){
+ if(!isAdminAuthed)return requestAdminAccess('admin');
  if(kind==="suppliers")renderSuppliersAdmin();
  if(kind==="purchase")renderPurchaseAdmin();
  if(kind==="stock")renderStockAdmin();
@@ -214,9 +278,9 @@ async function deleteCustomer(id){
  const {error}=await sb.from("customers").delete().eq("id",id);if(error)return alert(error.message);await refreshAll();showAdminPanel("manageCustomers")
 }
 window.addEventListener("load",async()=>{
-  if(!SUPABASE_URL||!SUPABASE_PUBLISHABLE_KEY){
-    alert("Supabase config not found. Keep your existing config.js.");
-    return;
-  }
-  await refreshAll();
+ if(!SUPABASE_URL||!SUPABASE_PUBLISHABLE_KEY){
+   alert("Supabase config not found. Keep your existing config.js.");
+   return;
+ }
+ await refreshAll();
 });
