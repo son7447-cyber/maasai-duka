@@ -17,3 +17,25 @@ main{max-width:720px;margin:auto;padding:16px}.view{display:none}.view.active{di
 .modal-card label{display:block;font-weight:700;margin:12px 0}.modal-card input,.modal-card select{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin-top:5px}
 .preview{width:100%;max-height:260px;object-fit:contain;background:#eee;border-radius:14px;margin:8px 0}.muted{color:var(--muted)}.warn{color:#9a6700}
 @media(min-width:700px){.admin-grid{grid-template-columns:repeat(3,1fr)}}
+/* ===== ADMIN MODE VISUAL ===== */
+body.admin-mode .top{
+  background:#5b2c24;
+}
+
+body.admin-mode .top strong::after{
+  content:"  •  ADMIN MODE";
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:1px;
+}
+
+body.admin-mode #admin h2::after{
+  content:"ADMIN MODE";
+  font-size:10px;
+  letter-spacing:1px;
+  padding:5px 8px;
+  margin-left:10px;
+  border-radius:6px;
+  background:#5b2c24;
+  color:white;
+}
