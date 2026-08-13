@@ -1,129 +1,111 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#111827" />
-  <title>Maasai Duka</title>
-  <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <title>Maasai Duka V1.1</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css?v=1.1">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <header>
-    <div>
-      <h1>MAASAI DUKA</h1>
-      <p>Johnson's Simple Sales & Credit Book</p>
+<header class="top">
+  <div><strong>MAASAI DUKA</strong><small>Simple Sales · Credit · Stock</small></div>
+  <button class="icon" onclick="showView('admin')">⚙</button>
+</header>
+
+<main id="app">
+  <section id="home" class="view active">
+    <div class="stats">
+      <div><small>Today's Sales</small><b id="todaySales">KES 0</b></div>
+      <div><small>Credit Today</small><b id="todayCredit">KES 0</b></div>
+      <div><small>Money to Collect</small><b class="danger" id="receivable">KES 0</b></div>
     </div>
-    <button class="small" id="refreshBtn">↻</button>
-  </header>
+    <div class="menu">
+      <button onclick="showView('sale')"><b>SALE</b><small>Cash / M-Pesa</small></button>
+      <button onclick="showView('credit')"><b>CREDIT</b><small>Sell on credit</small></button>
+      <button onclick="showView('repay')"><b>REPAY</b><small>Receive payment</small></button>
+      <button onclick="showView('customers')"><b>CUSTOMERS</b><small>Credit balances</small></button>
+      <button onclick="showView('products')"><b>PRODUCTS</b><small>Photos & prices</small></button>
+      <button onclick="showView('history')"><b>HISTORY</b><small>Transactions</small></button>
+    </div>
+  </section>
 
-  <main>
-    <section id="home" class="screen active">
-      <div class="summary">
-        <div><span>Today's Sales</span><strong id="todaySales">KES 0</strong></div>
-        <div><span>Credit Today</span><strong id="todayCredit">KES 0</strong></div>
-        <div class="danger"><span>Money to Collect</span><strong id="totalCredit">KES 0</strong></div>
-      </div>
+  <section id="products" class="view">
+    <div class="heading"><button class="back" onclick="goHome()">←</button><h2>Products</h2><button onclick="openProduct()">+ ADD</button></div>
+    <div id="productList" class="list"></div>
+  </section>
 
-      <div class="menu">
-        <button data-go="sale">🛒<b>SALE</b><small>Cash / M-Pesa</small></button>
-        <button data-go="credit">📒<b>CREDIT</b><small>Sell on credit</small></button>
-        <button data-go="repay">💰<b>REPAY</b><small>Receive payment</small></button>
-        <button data-go="customers">👥<b>CUSTOMERS</b><small>Credit balances</small></button>
-        <button data-go="products">📦<b>PRODUCTS</b><small>Photos & prices</small></button>
-        <button data-go="history">🧾<b>HISTORY</b><small>Transactions</small></button>
-      </div>
-    </section>
+  <section id="customers" class="view">
+    <div class="heading"><button class="back" onclick="goHome()">←</button><h2>Customers</h2><button onclick="openCustomer()">+ ADD</button></div>
+    <div id="customerList" class="list"></div>
+  </section>
 
-    <section id="sale" class="screen">
-      <div class="screen-title"><button class="back">←</button><h2>SALE</h2></div>
-      <div id="saleProducts" class="product-grid"></div>
-      <div class="cart">
-        <h3>Current Sale</h3>
-        <div id="saleCart"></div>
-        <label>Payment</label>
-        <div class="choice">
-          <button class="pay active" data-pay="cash">CASH</button>
-          <button class="pay" data-pay="mpesa">M-PESA</button>
-        </div>
-        <button id="saveSale" class="primary">SAVE SALE · <span id="saleTotal">KES 0</span></button>
-      </div>
-    </section>
+  <section id="sale" class="view">
+    <div class="heading"><button class="back" onclick="goHome()">←</button><h2>Sale</h2></div>
+    <div class="card">
+      <label>Product<select id="saleProduct"></select></label>
+      <label>Quantity<input id="saleQty" type="number" min="0.01" step="0.01" value="1"></label>
+      <label>Payment<select id="salePayment"><option>Cash</option><option>M-Pesa</option></select></label>
+      <button class="primary" onclick="saveSale(false)">SAVE SALE</button>
+    </div>
+  </section>
 
-    <section id="credit" class="screen">
-      <div class="screen-title"><button class="back">←</button><h2>CREDIT SALE</h2></div>
-      <label>Customer</label>
-      <select id="creditCustomer"><option value="">Choose customer</option></select>
-      <button class="secondary" id="quickCustomer">+ NEW CUSTOMER</button>
-      <div id="creditProducts" class="product-grid"></div>
-      <div class="cart">
-        <h3>Credit Items</h3>
-        <div id="creditCart"></div>
-        <button id="saveCredit" class="primary danger-btn">SAVE CREDIT · <span id="creditTotal">KES 0</span></button>
-      </div>
-    </section>
+  <section id="credit" class="view">
+    <div class="heading"><button class="back" onclick="goHome()">←</button><h2>Credit Sale</h2></div>
+    <div class="card">
+      <label>Customer<select id="creditCustomer"></select></label>
+      <label>Product<select id="creditProduct"></select></label>
+      <label>Quantity<input id="creditQty" type="number" min="0.01" step="0.01" value="1"></label>
+      <button class="primary" onclick="saveSale(true)">SAVE CREDIT</button>
+    </div>
+  </section>
 
-    <section id="repay" class="screen">
-      <div class="screen-title"><button class="back">←</button><h2>REPAY</h2></div>
-      <label>Customer</label>
-      <select id="repayCustomer"><option value="">Choose customer</option></select>
-      <div class="balance-box">Balance: <strong id="repayBalance">KES 0</strong></div>
-      <label>Amount received</label>
-      <input id="repayAmount" type="number" min="0" step="1" placeholder="KES" />
-      <label>Received by</label>
-      <div class="choice">
-        <button class="repay-pay active" data-pay="cash">CASH</button>
-        <button class="repay-pay" data-pay="mpesa">M-PESA</button>
-      </div>
-      <button id="saveRepay" class="primary">SAVE PAYMENT</button>
-    </section>
+  <section id="repay" class="view">
+    <div class="heading"><button class="back" onclick="goHome()">←</button><h2>Repayment</h2></div>
+    <div class="card">
+      <label>Customer<select id="repayCustomer"></select></label>
+      <label>Amount (KES)<input id="repayAmount" type="number" min="1"></label>
+      <label>Method<select id="repayMethod"><option>Cash</option><option>M-Pesa</option></select></label>
+      <button class="primary" onclick="saveRepayment()">SAVE PAYMENT</button>
+    </div>
+  </section>
 
-    <section id="customers" class="screen">
-      <div class="screen-title"><button class="back">←</button><h2>CUSTOMERS</h2></div>
-      <button id="addCustomerBtn" class="secondary">+ ADD CUSTOMER</button>
-      <div id="customerList" class="list"></div>
-    </section>
+  <section id="history" class="view">
+    <div class="heading"><button class="back" onclick="goHome()">←</button><h2>History</h2></div>
+    <div id="historyList" class="list"></div>
+  </section>
 
-    <section id="products" class="screen">
-      <div class="screen-title"><button class="back">←</button><h2>PRODUCTS</h2></div>
-      <button id="addProductBtn" class="secondary">📷 + ADD PRODUCT</button>
-      <p class="hint">Add a photo once. Johnson can then tap the product photo during sales.</p>
-      <div id="productAdmin" class="list"></div>
-    </section>
+  <section id="admin" class="view">
+    <div class="heading"><button class="back" onclick="goHome()">←</button><h2>ADMIN</h2><button onclick="refreshAll()">↻</button></div>
+    <div class="admin-grid">
+      <div><small>Sales</small><b id="aSales">KES 0</b></div>
+      <div><small>Purchases</small><b id="aPurchases">KES 0</b></div>
+      <div><small>Gross Margin*</small><b id="aMargin">KES 0</b></div>
+      <div><small>Stock Value*</small><b id="aStock">KES 0</b></div>
+      <div><small>Customer Credit</small><b id="aCredit">KES 0</b></div>
+      <div><small>Supplier Due</small><b id="aSupplierDue">KES 0</b></div>
+    </div>
+    <p class="note">*Estimated from recorded purchase cost and stock.</p>
+    <div class="menu admin-menu">
+      <button onclick="showAdminPanel('suppliers')"><b>SUPPLIERS</b><small>Suppliers & balances</small></button>
+      <button onclick="showAdminPanel('purchase')"><b>PURCHASE</b><small>Stock received</small></button>
+      <button onclick="showAdminPanel('stock')"><b>STOCK</b><small>Adjust inventory</small></button>
+      <button onclick="showAdminPanel('manageCustomers')"><b>MANAGE CUSTOMERS</b><small>Edit / remove unused</small></button>
+    </div>
+    <div id="adminPanel"></div>
+  </section>
+</main>
 
-    <section id="history" class="screen">
-      <div class="screen-title"><button class="back">←</button><h2>HISTORY</h2></div>
-      <div id="historyList" class="list"></div>
-    </section>
-  </main>
+<div id="modal" class="modal hidden">
+ <div class="modal-card">
+   <div class="modal-head"><h2 id="modalTitle"></h2><button class="x" onclick="closeModal()">×</button></div>
+   <div id="modalBody"></div>
+ </div>
+</div>
 
-  <dialog id="customerDialog">
-    <form method="dialog" id="customerForm">
-      <h3>New Customer</h3>
-      <label>Name</label><input id="customerName" required />
-      <label>Phone (optional)</label><input id="customerPhone" />
-      <div class="dialog-actions"><button value="cancel">CANCEL</button><button id="customerSave" value="default" class="primary">SAVE</button></div>
-    </form>
-  </dialog>
-
-  <dialog id="productDialog">
-    <form method="dialog" id="productForm">
-      <h3>Add Product</h3>
-      <label>Product photo</label>
-      <input id="productPhoto" type="file" accept="image/*" capture="environment" />
-      <img id="photoPreview" class="preview" alt="" />
-      <label>Name</label><input id="productName" required placeholder="e.g. Potato" />
-      <label>Price (KES)</label><input id="productPrice" type="number" min="0" step="1" required />
-      <label>Unit</label>
-      <select id="productUnit"><option>item</option><option>piece</option><option>kg</option><option>packet</option><option>bunch</option></select>
-      <div class="dialog-actions"><button value="cancel">CANCEL</button><button id="productSave" value="default" class="primary">SAVE</button></div>
-    </form>
-  </dialog>
-
-  <div id="toast"></div>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+<script src="config.js"></script>
+<script src="app.js?v=1.1"></script>
 </body>
 </html>
