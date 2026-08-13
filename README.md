@@ -1,4 +1,4 @@
-# Maasai Duka V1.0
+# Maasai Duka V1.1
 
 Johnson's mobile-first Simple Sales & Credit Book.
 
