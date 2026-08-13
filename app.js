@@ -5,26 +5,14 @@ const sb = window.supabase.createClient(
 const $=id=>document.getElementById(id);
 let products=[],customers=[],suppliers=[],sales=[],repayments=[],purchases=[],supplierPayments=[];
 let editingProduct=null,tempPhoto=null;
+let activeCategory="All";
+const PRODUCT_CATEGORIES=["Flour & Cereals","Vegetables","Fruits","Drinks","Snacks","Household","Other"];
 
 const money=n=>"KES "+Number(n||0).toLocaleString("en-KE",{maximumFractionDigits:2});
 const today=()=>new Date().toISOString().slice(0,10);
 const val=(o,...keys)=>{for(const k of keys)if(o&&o[k]!=null)return o[k];return null};
 const num=(o,...keys)=>Number(val(o,...keys)||0);
 function created(r){return val(r,"created_at","sale_date","date","purchased_at","paid_at")||""}
-// ===== ADMIN PIN =====
-const ADMIN_PIN = "0813";
-
-function openAdmin(){
-  const pin = prompt("Enter Admin PIN");
-  if(pin === null) return;
-
-  if(pin !== ADMIN_PIN){
-    alert("Wrong PIN");
-    return;
-  }
-
-  showView("admin");
-}
 function showView(id){
   document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
   $(id).classList.add("active");
@@ -60,12 +48,20 @@ function customerCredit(){
 function productName(id){return val(products.find(p=>String(p.id)===String(id)),"name","product_name")||"Product"}
 function customerName(id){return val(customers.find(c=>String(c.id)===String(id)),"name","customer_name")||"Customer"}
 function supplierName(id){return val(suppliers.find(c=>String(c.id)===String(id)),"name","supplier_name")||"Supplier"}
+function productCategory(p){return val(p,"category","product_category")||"Other"}
+function sortedProducts(){return [...products].sort((a,b)=>productCategory(a).localeCompare(productCategory(b))||String(val(a,"name","product_name")||"").localeCompare(String(val(b,"name","product_name")||"")))}
+function renderCategoryTabs(){
+ const el=$("categoryTabs");if(!el)return;
+ const cats=["All",...PRODUCT_CATEGORIES.filter(c=>products.some(p=>productCategory(p)===c))];
+ el.innerHTML=cats.map(c=>`<button class="${activeCategory===c?"active":""}" onclick="activeCategory='${c}';renderProducts()">${c}</button>`).join("");
+}
 function renderProducts(){
- if(!$("productList"))return;
- $("productList").innerHTML=products.length?products.map(p=>`<div class="row">
+ if(!$("productList"))return; renderCategoryTabs();
+ const list=sortedProducts().filter(p=>activeCategory==="All"||productCategory(p)===activeCategory);
+ $("productList").innerHTML=list.length?list.map(p=>`<div class="row">
   ${val(p,"image_url","photo_url")?`<img src="${val(p,"image_url","photo_url")}">`:`<div style="width:62px"></div>`}
-  <div class="grow"><b>${val(p,"name","product_name")||"Unnamed"}</b><small>${money(num(p,"price","selling_price"))} · Stock ${num(p,"stock_qty","stock","quantity")} ${val(p,"unit")||""}</small></div>
-  <div class="row-actions"><button onclick="openProduct('${p.id}')">EDIT</button></div></div>`).join(""):'<p class="muted">No products yet.</p>'
+  <div class="grow"><b>${val(p,"name","product_name")||"Unnamed"}</b><small>${productCategory(p)} · ${money(num(p,"price","selling_price"))} · Stock ${num(p,"stock_qty","stock","quantity")} ${val(p,"unit")||""}</small></div>
+  <div class="row-actions"><button onclick="openProduct('${p.id}')">EDIT</button></div></div>`).join(""):'<p class="muted">No products in this category.</p>'
 }
 function renderCustomers(){
  if(!$("customerList"))return;
@@ -84,10 +80,12 @@ function openProduct(id=null){
  <p class="muted">The selected photo is only a temporary preview. It is uploaded only when you choose “Use as representative photo”.</p>
  <label><input id="pKeepPhoto" type="checkbox" ${editingProduct?"":"checked"}> Use selected photo as representative photo</label>
  <label>Name<input id="pName" value="${val(p,"name","product_name")||""}"></label>
+ <label>Category<select id="pCategory">${PRODUCT_CATEGORIES.map(c=>`<option>${c}</option>`).join("")}</select></label>
  <label>Price (KES)<input id="pPrice" type="number" value="${num(p,"price","selling_price")||""}"></label>
  <label>Unit<select id="pUnit"><option>piece</option><option>kg</option><option>packet</option><option>bottle</option><option>crate</option><option>other</option></select></label>
- <button class="primary" onclick="saveProduct()">SAVE</button>`);
+ <button class="primary" onclick="saveProduct()">SAVE</button> ${editingProduct?`<button class="danger" onclick="deleteProduct('${editingProduct.id}')">DELETE PRODUCT</button>`:""}`);
  if(val(p,"unit"))$("pUnit").value=val(p,"unit");
+ $("pCategory").value=productCategory(p);
 }
 function previewPhoto(e){const f=e.target.files?.[0];if(!f)return;tempPhoto=f;const u=URL.createObjectURL(f);$("pPreview").src=u;$("pPreview").classList.remove("hidden")}
 async function uploadRepresentative(file){
@@ -98,16 +96,23 @@ async function uploadRepresentative(file){
  return sb.storage.from("product-images").getPublicUrl(path).data.publicUrl;
 }
 async function saveProduct(){
- const name=$("pName").value.trim(),price=Number($("pPrice").value||0),unit=$("pUnit").value;if(!name)return alert("Enter product name.");
+ const name=$("pName").value.trim(),price=Number($("pPrice").value||0),unit=$("pUnit").value,category=$("pCategory").value;if(!name)return alert("Enter product name.");
  let image=val(editingProduct,"image_url","photo_url")||null;
  if(tempPhoto && $("pKeepPhoto").checked){const u=await uploadRepresentative(tempPhoto);if(u)image=u}
- let payload={name,price,unit,image_url:image};
+ let payload={name,price,unit,category,image_url:image};
  let res=editingProduct?await sb.from("products").update(payload).eq("id",editingProduct.id):await sb.from("products").insert(payload);
  if(res.error){
-   payload={name,selling_price:price,unit,photo_url:image};
+   payload={name,selling_price:price,unit,category,photo_url:image};
    res=editingProduct?await sb.from("products").update(payload).eq("id",editingProduct.id):await sb.from("products").insert(payload);
  }
  if(res.error)return alert("Could not save product: "+res.error.message);
+ closeModal();await refreshAll();
+}
+
+async function deleteProduct(id){
+ if(!confirm("Delete this product? If it is used in old transactions, the database may protect it."))return;
+ const {error}=await sb.from("products").delete().eq("id",id);
+ if(error)return alert("Could not delete product: "+error.message);
  closeModal();await refreshAll();
 }
 function openCustomer(){
