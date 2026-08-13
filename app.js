@@ -141,6 +141,10 @@ function openProduct(id=null){
  modal(editingProduct?"Edit Product":"Add Product",`
  <label>Product photo <input id="pPhoto" type="file" accept="image/*" capture="environment" onchange="previewPhoto(event)"></label>
  <img id="pPreview" class="preview ${val(p,"image_url","photo_url")?"":"hidden"}" src="${val(p,"image_url","photo_url")||""}">
+ <div id="aiRecognition" class="ai-recognition ${editingProduct?"hidden":""}">
+   <div class="ai-title">✨ AI Product Recognition</div>
+   <div id="aiRecognitionText" class="ai-text">Take a photo and the app will suggest the product name and category automatically.</div>
+ </div>
  <p class="muted">The selected photo is only a temporary preview. It is uploaded only when you choose “Use as representative photo”.</p>
  <label><input id="pKeepPhoto" type="checkbox" ${editingProduct?"":"checked"}> Use selected photo as representative photo</label>
  <label>Name<input id="pName" value="${val(p,"name","product_name")||""}"></label>
@@ -150,7 +154,65 @@ function openProduct(id=null){
  <button class="primary" onclick="saveProduct()">SAVE</button>`);
  if(val(p,"unit"))$("pUnit").value=val(p,"unit");
 }
-function previewPhoto(e){const f=e.target.files?.[0];if(!f)return;tempPhoto=f;const u=URL.createObjectURL(f);$("pPreview").src=u;$("pPreview").classList.remove("hidden")}
+async function previewPhoto(e){
+ const f=e.target.files?.[0];if(!f)return;
+ tempPhoto=f;
+ const u=URL.createObjectURL(f);$("pPreview").src=u;$("pPreview").classList.remove("hidden");
+ if(!editingProduct)await recognizeProductPhoto(f);
+}
+function setAIRecognition(html,state=""){
+ const box=$("aiRecognition"),text=$("aiRecognitionText");if(!box||!text)return;
+ box.classList.remove("hidden","loading","success","warning","error");
+ if(state)box.classList.add(state);
+ text.innerHTML=html;
+}
+async function resizeImageForAI(file){
+ const objectUrl=URL.createObjectURL(file);
+ try{
+   const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=objectUrl});
+   const max=768,scale=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
+   const w=Math.max(1,Math.round((img.naturalWidth||img.width)*scale)),h=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));
+   const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
+   const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,w,h);
+   const dataUrl=canvas.toDataURL("image/jpeg",0.76);
+   return {image:dataUrl.split(",")[1],mimeType:"image/jpeg"};
+ }finally{URL.revokeObjectURL(objectUrl)}
+}
+async function recognizeProductPhoto(file){
+ setAIRecognition('<span class="ai-spinner"></span> Looking at the photo…','loading');
+ try{
+   const payload=await resizeImageForAI(file);
+   payload.existingNames=products.map(p=>val(p,"name","product_name")).filter(Boolean).slice(0,150);
+   const response=await fetch("/api/recognize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(result.error||"AI recognition is not available yet.");
+   const confidence=Math.max(0,Math.min(1,Number(result.confidence)||0));
+   const pct=Math.round(confidence*100);
+   const recognizedName=String(result.name||"").trim();
+   const recognizedCategory=PRODUCT_CATEGORIES.includes(result.category)?result.category:"Other";
+   const existing=products.find(p=>String(val(p,"name","product_name")||"").trim().toLowerCase()===recognizedName.toLowerCase());
+   if(confidence>=0.60&&recognizedName){
+     $("pName").value=recognizedName;
+     $("pCategory").value=recognizedCategory;
+   }
+   if(existing){
+     setAIRecognition(`<b>${escapeHTML(recognizedName)}</b> looks like a product already in the list. <span class="ai-score">${pct}%</span><br><small>${escapeHTML(recognizedCategory)} · Avoid making a duplicate.</small><br><button type="button" class="ai-existing-btn" onclick="openExistingFromAI('${existing.id}')">OPEN EXISTING PRODUCT</button>`,'warning');
+     return;
+   }
+   if(confidence>=0.60&&recognizedName){
+     const alts=Array.isArray(result.alternatives)&&result.alternatives.length?`<br><small>Other possibilities: ${result.alternatives.slice(0,2).map(escapeHTML).join(", ")}</small>`:"";
+     setAIRecognition(`<b>Recognized: ${escapeHTML(recognizedName)}</b> <span class="ai-score">${pct}%</span><br><small>${escapeHTML(recognizedCategory)} · Name and category filled automatically.</small>${alts}`,'success');
+   }else{
+     const alts=Array.isArray(result.alternatives)&&result.alternatives.length?result.alternatives.slice(0,3).map(escapeHTML).join(", "):"Not sure";
+     setAIRecognition(`<b>Not sure enough to fill automatically.</b> <span class="ai-score">${pct}%</span><br><small>Possible: ${alts}</small>`,'warning');
+   }
+ }catch(err){
+   console.warn("AI recognition",err);
+   setAIRecognition(`<b>AI recognition unavailable.</b><br><small>${escapeHTML(err.message||"Please enter the product manually.")}</small>`,'error');
+ }
+}
+function escapeHTML(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function openExistingFromAI(id){tempPhoto=null;openProduct(id)}
 async function uploadRepresentative(file){
  if(!file)return null;
  const ext=(file.name.split(".").pop()||"jpg").toLowerCase(), path=`products/${crypto.randomUUID?crypto.randomUUID():Date.now()}.${ext}`;
