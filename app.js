@@ -1,7 +1,7 @@
-const cfg = window.MAASAI_DUKA_CONFIG || window.APP_CONFIG || window.config || {};
-const SUPABASE_URL = cfg.supabaseUrl || cfg.url || window.SUPABASE_URL;
-const SUPABASE_KEY = cfg.supabaseKey || cfg.anonKey || cfg.publishableKey || window.SUPABASE_KEY;
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
 const $=id=>document.getElementById(id);
 let products=[],customers=[],suppliers=[],sales=[],repayments=[],purchases=[],supplierPayments=[];
 let editingProduct=null,tempPhoto=null;
