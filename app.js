@@ -11,7 +11,14 @@ const today=()=>new Date().toISOString().slice(0,10);
 const val=(o,...keys)=>{for(const k of keys)if(o&&o[k]!=null)return o[k];return null};
 const num=(o,...keys)=>Number(val(o,...keys)||0);
 function created(r){return val(r,"created_at","sale_date","date","purchased_at","paid_at")||""}
-function showView(id){document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));$(id).classList.add("active");if(id==="admin")loadAdmin();if(id==="history")renderHistory();window.scrollTo(0,0)}
+function showView(id){
+  document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
+  $(id).classList.add("active");
+  document.body.classList.toggle("admin-mode", id === "admin");
+  if(id==="admin") loadAdmin();
+  if(id==="history") renderHistory();
+  window.scrollTo(0,0);
+}
 function goHome(){showView("home");refreshAll()}
 function closeModal(){$("modal").classList.add("hidden");tempPhoto=null;editingProduct=null}
 function modal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("modal").classList.remove("hidden")}
@@ -187,4 +194,10 @@ async function deleteCustomer(id){
  if(!confirm("Delete this customer? Customers referenced by transactions may be protected by the database."))return;
  const {error}=await sb.from("customers").delete().eq("id",id);if(error)return alert(error.message);await refreshAll();showAdminPanel("manageCustomers")
 }
-window.addEventListener("load",async()=>{if(!SUPABASE_URL||!SUPABASE_KEY){alert("Supabase config not found. Keep your existing config.js.");return}await refreshAll()});
+window.addEventListener("load",async()=>{
+  if(!SUPABASE_URL||!SUPABASE_PUBLISHABLE_KEY){
+    alert("Supabase config not found. Keep your existing config.js.");
+    return;
+  }
+  await refreshAll();
+});
